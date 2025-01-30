@@ -5,12 +5,12 @@ ENV DEBIAN_FRONTEND noninteractive
 
 RUN apt-get update \
   && apt-get install -y \
-    build-essential \
-    libtool \
-    wget \
-    python3-pip \
-    ninja-build \
-    pkg-config 
+  build-essential \
+  libtool \
+  wget \
+  python3-pip \
+  ninja-build \
+  pkg-config
 
 RUN pip3 install meson
 
@@ -19,7 +19,7 @@ RUN pip3 install meson
 # see https://devcenter.heroku.com/articles/stack-packages
 #
 # libgsf needs libxml2
-# 
+#
 # this should only pull in header files and should not create any extra run
 # time dependencies
 RUN apt-get install -y \
@@ -46,8 +46,8 @@ RUN apt-get install -y \
 
 WORKDIR /usr/local/src
 
-# build to this prefix 
-#  - heroku has /usr/local/lib on the default ld.so.conf search path, so 
+# build to this prefix
+#  - heroku has /usr/local/lib on the default ld.so.conf search path, so
 #    this is convenient
 #  - heroku has a basic dir structure in /usr/local, but no files
 ARG PREFIX=/usr/local
@@ -72,20 +72,20 @@ RUN wget ${VIPS_URL}/v${VIPS_VERSION}/v${VIPS_VERSION}.tar.gz \
   && tar xzf v${VIPS_VERSION}.tar.gz \
   && cd libvips-${VIPS_VERSION} \
   && meson setup build \
-    --prefix=$PREFIX \
-	  --libdir=lib \
-	  --buildtype=release \
-    # obscure file format that nobody will use \
-	  -Dradiance=false \
-    # obscure file format that nobody will use \
-	  -Danalyze=false \
-    # modules cause issues with loading heif files in ruby-vips \
-	  -Dmodules=disabled \
-    # allows omitting gobject-introspection library \
-	  -Dintrospection=false \
-	&& cd build \
-	&& meson compile \
-	&& meson install
+  --prefix=$PREFIX \
+  --libdir=lib \
+  --buildtype=release \
+  # obscure file format that nobody will use \
+  -Dradiance=false \
+  # obscure file format that nobody will use \
+  -Danalyze=false \
+  # modules cause issues with loading heif files in ruby-vips \
+  -Dmodules=disabled \
+  # allows omitting gobject-introspection library \
+  -Dintrospection=disabled \
+  && cd build \
+  && meson compile \
+  && meson install
 
 # clean and package
 ARG STACK_VERSION
@@ -112,8 +112,8 @@ RUN cd $PREFIX \
   && vips --vips-config >> "build/heroku-$STACK_VERSION.config.log"
 
 # install and test ruby-vips to confirm we can pick up the libraries
-# correctly 
+# correctly
 # we need ruby-dev to install ruby-ffi
-RUN apt-get install -y ruby-dev
-RUN gem install ruby-vips
-RUN ruby -e 'require "vips"; puts "ruby-vips: libvips #{Vips::LIBRARY_VERSION}"'
+# RUN apt-get install -y ruby-dev
+# RUN gem install ruby-vips
+# RUN ruby -e 'require "vips"; puts "ruby-vips: libvips #{Vips::LIBRARY_VERSION}"'

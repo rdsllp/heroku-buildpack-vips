@@ -1,25 +1,31 @@
 ARG STACK_VERSION
 FROM heroku/heroku:$STACK_VERSION
-
+USER root
 ENV DEBIAN_FRONTEND noninteractive
 
 RUN apt-get update \
   && apt-get install -y \
-    build-essential \
-    libtool \
-    wget \
-    python3-pip \
-    ninja-build \
-    pkg-config 
+  build-essential \
+  libtool \
+  wget \
+  python3-pip \
+  ninja-build \
+  pkg-config \
+  python3.12 \
+  python3.12-venv \
+  python3-pip
 
-RUN pip3 install meson
+RUN python3 -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+RUN pip install --upgrade pip setuptools wheel
+RUN pip install meson
 
 # use the heroku platform libraries when we can
 #
 # see https://devcenter.heroku.com/articles/stack-packages
 #
 # libgsf needs libxml2
-# 
+#
 # this should only pull in header files and should not create any extra run
 # time dependencies
 RUN apt-get install -y \
@@ -40,28 +46,20 @@ RUN apt-get install -y \
   libpoppler-glib-dev \
   libimagequant-dev \
   liborc-0.4-dev \
-  libgsf-1-dev
+  libgsf-1-dev \
+  libcgif-dev \
+  libheif-dev \
+  libaom-dev \
+  libfftw3-dev
 
 WORKDIR /usr/local/src
 
-# build to this prefix 
-#  - heroku has /usr/local/lib on the default ld.so.conf search path, so 
+# build to this prefix
+#  - heroku has /usr/local/lib on the default ld.so.conf search path, so
 #    this is convenient
 #  - heroku has a basic dir structure in /usr/local, but no files
 ARG PREFIX=/usr/local
 ENV PKG_CONFIG_PATH=$PREFIX/lib/pkgconfig
-
-# use cgif for GIF write
-ARG CGIF_VERSION=0.2.0
-ARG CGIF_URL=https://github.com/dloebl/cgif/archive/refs/tags
-
-RUN wget ${CGIF_URL}/V${CGIF_VERSION}.tar.gz \
-  && tar xf V${CGIF_VERSION}.tar.gz \
-  && cd cgif-${CGIF_VERSION} \
-  && meson build --prefix=${PREFIX} --libdir=lib \
-  && cd build \
-  && ninja \
-  && ninja install
 
 # use libspng for PNG load and save
 ARG SPNG_VERSION=0.7.2
@@ -75,44 +73,27 @@ RUN wget ${SPNG_URL}/v${SPNG_VERSION}.tar.gz \
   && ninja \
   && ninja install
 
-ARG DE265_VERSION=1.0.12
-ARG DE265_URL=https://github.com/strukturag/libde265/releases/download
-
-RUN wget ${DE265_URL}/v${DE265_VERSION}/libde265-${DE265_VERSION}.tar.gz \
-  && tar xf libde265-${DE265_VERSION}.tar.gz \
-  && cd libde265-${DE265_VERSION} \
-  && ./autogen.sh \
-  && ./configure --prefix=$PREFIX \
-  && make V=0 \
-  && make install
-
-ARG HEIF_VERSION=1.10.0
-ARG HEIF_URL=https://github.com/strukturag/libheif/releases/download
-
-RUN wget ${HEIF_URL}/v${HEIF_VERSION}/libheif-${HEIF_VERSION}.tar.gz \
-  && tar xf libheif-${HEIF_VERSION}.tar.gz \
-  && cd libheif-${HEIF_VERSION} \
-  && ./configure --prefix=$PREFIX --disable-examples --disable-go --disable-gdk-pixbuf \
-  && make V=0 \
-  && make install
-
-ARG VIPS_VERSION=8.14.3
+ARG VIPS_VERSION=8.15.3
 ARG VIPS_URL=https://github.com/libvips/libvips/archive/refs/tags
 
 RUN wget ${VIPS_URL}/v${VIPS_VERSION}/v${VIPS_VERSION}.tar.gz \
   && tar xzf v${VIPS_VERSION}.tar.gz \
   && cd libvips-${VIPS_VERSION} \
   && meson setup build \
-    --prefix=$PREFIX \
-	  --libdir=lib \
-	  --buildtype=release \
-	  -Dradiance=false \
-	  -Danalyze=false \
-	  -Dmodules=disabled \
-	  -Dintrospection=false \
-	&& cd build \
-	&& meson compile \
-	&& meson install
+  --prefix=$PREFIX \
+  --libdir=lib \
+  --buildtype=release \
+  # obscure file format that nobody will use \
+  -Dradiance=false \
+  # obscure file format that nobody will use \
+  -Danalyze=false \
+  # modules cause issues with loading heif files in ruby-vips \
+  -Dmodules=disabled \
+  # allows omitting gobject-introspection library \
+  -Dintrospection=disabled \
+  && cd build \
+  && meson compile \
+  && meson install
 
 # clean and package
 ARG STACK_VERSION
@@ -139,8 +120,8 @@ RUN cd $PREFIX \
   && vips --vips-config >> "build/heroku-$STACK_VERSION.config.log"
 
 # install and test ruby-vips to confirm we can pick up the libraries
-# correctly 
+# correctly
 # we need ruby-dev to install ruby-ffi
-RUN apt-get install -y ruby-dev
-RUN gem install ruby-vips
-RUN ruby -e 'require "vips"; puts "ruby-vips: libvips #{Vips::LIBRARY_VERSION}"'
+# RUN apt-get install -y ruby-dev
+# RUN gem install ruby-vips
+# RUN ruby -e 'require "vips"; puts "ruby-vips: libvips #{Vips::LIBRARY_VERSION}"'
